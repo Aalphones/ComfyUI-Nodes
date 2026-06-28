@@ -22,8 +22,8 @@ batch_suite/
 └── web/           # JS-Frontend (Fortschritt, Drag & Drop, …)
 ```
 
-Lose `.py`-Dateien im Root (`random_line.py`, `safe_border_crop.py` usw.) sind
-eigenständige Hilfsskripte — kein Teil der Batch Suite.
+ComfyUI-Nodes liegen in `batch_suite/nodes/`. Der Root enthält nur noch den
+Paket-Einstieg für ComfyUI und Projektdokumentation.
 
 ## Konventionen
 
