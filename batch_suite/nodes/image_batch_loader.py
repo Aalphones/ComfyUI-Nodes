@@ -8,8 +8,8 @@ import numpy as np
 import torch
 from PIL import Image, ImageOps
 
-from batch_suite.core.batch_engine import BatchEngine
-from batch_suite.providers.image_provider import ImageBatchProvider
+from ..core.batch_engine import BatchEngine
+from ..providers.image_provider import ImageBatchProvider
 
 
 class ImageBatchLoader:
@@ -61,7 +61,7 @@ class ImageBatchLoader:
         date_format: str,
         stop_on_error: bool,
         skip_failed_images: bool,
-    ) -> tuple[torch.Tensor, torch.Tensor, str, int, int, str, str, str]:
+    ) -> dict[str, Any]:
         provider = ImageBatchProvider(
             image_paths,
             prefix=prefix,
@@ -74,7 +74,7 @@ class ImageBatchLoader:
         job = BatchEngine(provider).get_next_job()
         image, mask = self._load_image(job.payload)
 
-        return (
+        result = (
             image,
             mask,
             job.save_filename,
@@ -84,6 +84,11 @@ class ImageBatchLoader:
             job.metadata["original_filename_no_ext"],
             job.metadata["file_extension"],
         )
+        # The frontend reads these to decide whether to auto-queue the next image.
+        return {
+            "ui": {"batch_index": [job.index], "batch_total": [job.total]},
+            "result": result,
+        }
 
     def _load_image(self, image_path: Path) -> tuple[torch.Tensor, torch.Tensor]:
         with Image.open(image_path) as loaded_image:

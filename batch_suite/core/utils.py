@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
 
-
-def split_lines_to_paths(raw_paths: str) -> list[Path]:
-    paths: list[Path] = []
-    for raw_line in raw_paths.splitlines():
+def split_lines(raw_text: str) -> list[str]:
+    lines: list[str] = []
+    for raw_line in raw_text.splitlines():
         cleaned_line = raw_line.strip().strip('"')
         if cleaned_line:
-            paths.append(Path(cleaned_line).expanduser())
-    return paths
+            lines.append(cleaned_line)
+    return lines

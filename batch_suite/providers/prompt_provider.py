@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from batch_suite.core.filename_generator import FilenameGenerator
-from batch_suite.core.interfaces import BatchJob
+from ..core.filename_generator import FilenameGenerator
+from ..core.interfaces import BatchJob
 
 
 TXT_EXTENSION = ".txt"

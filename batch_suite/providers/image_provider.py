@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from batch_suite.core.filename_generator import FilenameGenerator
-from batch_suite.core.interfaces import BatchJob
-from batch_suite.core.utils import split_lines_to_paths
+from ..core.comfy_input import resolve_input_name
+from ..core.filename_generator import FilenameGenerator
+from ..core.interfaces import BatchJob
+from ..core.utils import split_lines
 
 
 SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
@@ -33,9 +34,11 @@ class ImageBatchProvider:
         self.started_at = datetime.now()
 
     def build_jobs(self) -> list[BatchJob]:
-        paths = split_lines_to_paths(self.raw_image_paths)
-        if not paths:
+        lines = split_lines(self.raw_image_paths)
+        if not lines:
             raise ValueError("No image path provided.")
+
+        paths = [self._resolve_line(line) for line in lines]
 
         valid_paths = self._collect_valid_paths(paths)
         if not valid_paths:
@@ -68,6 +71,20 @@ class ImageBatchProvider:
                 )
             )
         return jobs
+
+    def _resolve_line(self, line: str) -> Path:
+        # Absolute / typed paths win when they point at a real file (backwards compatible).
+        direct_path = Path(line).expanduser()
+        if direct_path.is_file():
+            return direct_path
+
+        # Otherwise treat the line as a name uploaded into ComfyUI's input/ folder.
+        input_path = resolve_input_name(line)
+        if input_path is not None:
+            return input_path
+
+        # Fall through so validation reports a clear "file does not exist" error.
+        return direct_path
 
     def _collect_valid_paths(self, paths: list[Path]) -> list[Path]:
         valid_paths: list[Path] = []

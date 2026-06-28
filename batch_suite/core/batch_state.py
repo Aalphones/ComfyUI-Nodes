@@ -35,3 +35,7 @@ class BatchStateStore:
     @classmethod
     def reset(cls, signature: str) -> None:
         cls._runs.pop(signature, None)
+
+    @classmethod
+    def reset_all(cls) -> None:
+        cls._runs.clear()

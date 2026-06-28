@@ -3,8 +3,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from batch_suite.core.batch_engine import BatchEngine
-from batch_suite.providers.prompt_provider import PromptBatchProvider
+from ..core.batch_engine import BatchEngine
+from ..providers.prompt_provider import PromptBatchProvider
 
 
 class PromptBatchLoader:
