@@ -14,14 +14,13 @@ function getPathsWidget(node) {
   return node.widgets?.find((widget) => widget.name === PATHS_WIDGET_NAME);
 }
 
-function appendUploadedNames(node, uploadedNames) {
+function replaceUploadedNames(node, uploadedNames) {
   const widget = getPathsWidget(node);
   if (!widget) {
     return;
   }
 
-  const existingLines = widget.value ? widget.value.split('\n').filter(Boolean) : [];
-  widget.value = [...existingLines, ...uploadedNames].join('\n');
+  widget.value = uploadedNames.join('\n');
   node.setDirtyCanvas(true, true);
 }
 
@@ -51,7 +50,7 @@ async function handleDroppedImages(node, files) {
   }
 
   if (uploadedNames.length > 0) {
-    appendUploadedNames(node, uploadedNames);
+    replaceUploadedNames(node, uploadedNames);
   }
 }
 
@@ -72,6 +71,24 @@ function installDropHandlers(nodeType) {
     // Returning true tells ComfyUI we handled the drop, so it does not spawn
     // one LoadImage node per file (the behaviour we are replacing).
     return true;
+  };
+}
+
+function installApiMarker() {
+  // ComfyUI only adds "upload":"image" for COMBO widgets with image_upload:true.
+  // We inject the marker for ImageBatchLoader so API clients and ComfyUI's own
+  // API view recognise it as an image-upload entry point.
+  const originalGraphToPrompt = app.graphToPrompt.bind(app);
+  app.graphToPrompt = async function graphToPrompt(...args) {
+    const result = await originalGraphToPrompt(...args);
+    if (result?.output) {
+      for (const nodeData of Object.values(result.output)) {
+        if (nodeData.class_type === TARGET_NODE_CLASS) {
+          nodeData.inputs.upload = 'image';
+        }
+      }
+    }
+    return result;
   };
 }
 
@@ -118,6 +135,7 @@ app.registerExtension({
     }
   },
   setup() {
+    installApiMarker();
     installAutoRequeue();
   },
 });
