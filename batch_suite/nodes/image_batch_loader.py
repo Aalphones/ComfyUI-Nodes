@@ -9,6 +9,7 @@ import torch
 from PIL import Image, ImageOps
 
 from ..core.batch_engine import BatchEngine
+from ..core.logger import get_logger
 from ..providers.image_provider import ImageBatchProvider
 
 
@@ -71,8 +72,28 @@ class ImageBatchLoader:
             should_stop_on_error=stop_on_error,
             should_skip_failed_images=skip_failed_images,
         )
-        job = BatchEngine(provider).get_next_job()
-        image, mask = self._load_image(job.payload)
+        engine = BatchEngine(provider)
+        job = engine.get_next_job()
+        total = job.total
+
+        image: torch.Tensor | None = None
+        mask: torch.Tensor | None = None
+        last_error: Exception | None = None
+
+        for attempt in range(total):
+            try:
+                image, mask = self._load_image(job.payload)
+                break
+            except Exception as error:
+                last_error = error
+                get_logger().warning(
+                    "Skipping image %s/%s '%s': %s",
+                    job.index, total, job.payload.name, error,
+                )
+                if attempt < total - 1:
+                    job = engine.get_next_job()
+        else:
+            raise ValueError(f"All {total} images failed to load. Last error: {last_error}")
 
         result = (
             image,

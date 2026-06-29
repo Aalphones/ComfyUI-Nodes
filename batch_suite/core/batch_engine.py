@@ -23,8 +23,9 @@ class BatchEngine:
         return job
 
     def _build_signature(self, jobs: list[BatchJob]) -> str:
+        # Only hash the file paths — save_filename includes a date that changes
+        # across midnight and would create a new BatchRun (cursor reset) unexpectedly.
         digest = hashlib.sha256()
         for job in jobs:
             digest.update(str(job.payload).encode("utf-8"))
-            digest.update(job.save_filename.encode("utf-8"))
         return digest.hexdigest()

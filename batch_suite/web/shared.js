@@ -6,9 +6,6 @@ const PATHS_WIDGET_NAME = 'image_paths';
 const RESET_ENDPOINT = '/batch_suite/reset';
 const UPLOAD_ENDPOINT = '/upload/image';
 
-// True while we are driving the queue ourselves, so the queue wrapper below
-// does not reset the server cursor between images of the same batch run.
-let isAutoQueueing = false;
 
 function getPathsWidget(node) {
   return node.widgets?.find((widget) => widget.name === PATHS_WIDGET_NAME);
@@ -27,7 +24,7 @@ function replaceUploadedNames(node, uploadedNames) {
 async function uploadImage(file) {
   const body = new FormData();
   body.append('image', file);
-  body.append('overwrite', 'false');
+  body.append('overwrite', 'true');
 
   const response = await api.fetchApi(UPLOAD_ENDPOINT, { method: 'POST', body });
   if (response.status !== 200) {
@@ -51,6 +48,11 @@ async function handleDroppedImages(node, files) {
 
   if (uploadedNames.length > 0) {
     replaceUploadedNames(node, uploadedNames);
+    // New images landed — reset the server cursor so the next queue run
+    // starts at image 1 instead of resuming a previous batch position.
+    api.fetchApi(RESET_ENDPOINT, { method: 'POST' }).catch((error) => {
+      console.warn('[batch_suite] cursor reset failed:', error);
+    });
   }
 }
 
@@ -93,17 +95,9 @@ function installApiMarker() {
 }
 
 function installAutoRequeue() {
-  // Reset the server-side cursor when the user starts a fresh run, so the batch
-  // begins at the first image instead of resuming a previous/aborted position.
-  const originalQueuePrompt = app.queuePrompt.bind(app);
-  app.queuePrompt = async function queuePrompt(number, batchCount) {
-    const hasBatchLoader = app.graph.findNodesByType(TARGET_NODE_CLASS).length > 0;
-    if (!isAutoQueueing && hasBatchLoader) {
-      await api.fetchApi(RESET_ENDPOINT, { method: 'POST' });
-    }
-    return originalQueuePrompt(number, batchCount);
-  };
-
+  // Continue the batch automatically after each successful image execution.
+  // The cursor on the server side persists between queue runs — no reset, no
+  // restart from the beginning if the run was interrupted mid-batch.
   api.addEventListener('executed', ({ detail }) => {
     const output = detail?.output;
     if (!output || output.batch_index === undefined) {
@@ -113,18 +107,9 @@ function installAutoRequeue() {
     const currentIndex = output.batch_index[0];
     const totalItems = output.batch_total[0];
     if (currentIndex < totalItems) {
-      isAutoQueueing = true;
       app.queuePrompt(0, 1);
-    } else {
-      isAutoQueueing = false;
     }
   });
-
-  const stopAutoQueueing = () => {
-    isAutoQueueing = false;
-  };
-  api.addEventListener('execution_error', stopAutoQueueing);
-  api.addEventListener('execution_interrupted', stopAutoQueueing);
 }
 
 app.registerExtension({
