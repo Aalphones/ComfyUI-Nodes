@@ -73,7 +73,7 @@ class ImageBatchLoader:
             should_skip_failed_images=skip_failed_images,
         )
         engine = BatchEngine(provider)
-        job = engine.get_next_job()
+        job = engine.get_next_job(run_type="ImageBatchLoader")
         total = job.total
 
         image: torch.Tensor | None = None

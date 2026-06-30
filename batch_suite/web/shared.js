@@ -50,7 +50,11 @@ async function handleDroppedImages(node, files) {
     replaceUploadedNames(node, uploadedNames);
     // New images landed — reset the server cursor so the next queue run
     // starts at image 1 instead of resuming a previous batch position.
-    api.fetchApi(RESET_ENDPOINT, { method: 'POST' }).catch((error) => {
+    api.fetchApi(RESET_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: TARGET_NODE_CLASS }),
+    }).catch((error) => {
       console.warn('[batch_suite] cursor reset failed:', error);
     });
   }
@@ -95,13 +99,25 @@ function installApiMarker() {
 }
 
 function installAutoRequeue() {
-  // Continue the batch automatically after each successful image execution.
+  // Continue the batch automatically after each successful execution.
   // The cursor on the server side persists between queue runs — no reset, no
   // restart from the beginning if the run was interrupted mid-batch.
   api.addEventListener('executed', ({ detail }) => {
     const output = detail?.output;
     if (!output || output.batch_index === undefined) {
       return;
+    }
+
+    // Guard: only requeue when the node that just executed is part of the
+    // currently loaded canvas graph. Without this, a batch running in a queued
+    // workflow can accidentally trigger re-queuing of a completely different
+    // workflow that happens to be loaded on the canvas at that moment.
+    const nodeId = detail?.node;
+    if (nodeId !== undefined) {
+      const node = app.graph.getNodeById(parseInt(nodeId, 10));
+      if (!node) {
+        return;
+      }
     }
 
     const currentIndex = output.batch_index[0];

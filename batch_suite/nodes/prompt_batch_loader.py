@@ -68,7 +68,7 @@ class PromptBatchLoader:
             should_skip_empty_files=skip_empty_files,
             should_stop_on_error=stop_on_error,
         )
-        job = BatchEngine(provider).get_next_job()
+        job = BatchEngine(provider).get_next_job(run_type="PromptBatchLoader")
         prompt = job.payload.read_text(encoding="utf-8-sig", errors="replace")
 
         result = (

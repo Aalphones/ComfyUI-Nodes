@@ -18,9 +18,22 @@ def register_routes() -> None:
 
     @PromptServer.instance.routes.post("/batch_suite/reset")
     async def reset_batches(request: "web.Request") -> "web.Response":
-        # The frontend calls this once when a fresh batch run starts, so the
-        # server-side cursor begins at the first image instead of resuming
-        # wherever a previous (possibly aborted) run left off.
-        BatchStateStore.reset_all()
-        get_logger().info("Batch state reset by client.")
+        # The frontend calls this when a fresh batch run starts so the cursor
+        # begins at item 1 instead of resuming a previous position.
+        # An optional JSON body {"type": "ImageBatchLoader"} scopes the reset
+        # to only that node type — other batch loaders keep their cursors.
+        run_type: str = ""
+        try:
+            body = await request.json()
+            run_type = body.get("type", "")
+        except Exception:
+            pass
+
+        if run_type:
+            BatchStateStore.reset_by_type(run_type)
+            get_logger().info("Batch state reset for type '%s' by client.", run_type)
+        else:
+            BatchStateStore.reset_all()
+            get_logger().info("Batch state reset (all) by client.")
+
         return web.json_response({"ok": True})

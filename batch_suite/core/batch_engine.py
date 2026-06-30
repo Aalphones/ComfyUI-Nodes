@@ -11,13 +11,13 @@ class BatchEngine:
     def __init__(self, provider: BatchProvider) -> None:
         self.provider = provider
 
-    def get_next_job(self) -> BatchJob:
+    def get_next_job(self, run_type: str = "") -> BatchJob:
         jobs = self.provider.build_jobs()
         if not jobs:
             raise ValueError("No batch jobs available.")
 
         signature = self._build_signature(jobs)
-        batch_run = BatchStateStore.get_or_create_run(signature, jobs)
+        batch_run = BatchStateStore.get_or_create_run(signature, jobs, run_type)
         job = batch_run.current_job()
         get_logger().info("Batch item %s/%s: %s", job.index, job.total, job.payload.name)
         return job
