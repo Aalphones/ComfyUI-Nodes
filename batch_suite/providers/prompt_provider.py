@@ -51,7 +51,7 @@ class PromptBatchProvider:
 
         jobs: list[BatchJob] = []
         for prompt_file in prompt_files:
-            if self.should_skip_empty_files and not prompt_file.read_text(encoding="utf-8-sig").strip():
+            if self.should_skip_empty_files and not prompt_file.read_text(encoding="utf-8-sig", errors="replace").strip():
                 continue
 
             relative_path = prompt_file.relative_to(self.folder_path).as_posix()

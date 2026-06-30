@@ -57,7 +57,7 @@ class PromptBatchLoader:
         recursive: bool,
         skip_empty_files: bool,
         stop_on_error: bool,
-    ) -> tuple[str, str, int, int, str, str, str]:
+    ) -> dict:
         provider = PromptBatchProvider(
             folder_path,
             prefix=prefix,
@@ -69,9 +69,9 @@ class PromptBatchLoader:
             should_stop_on_error=stop_on_error,
         )
         job = BatchEngine(provider).get_next_job()
-        prompt = job.payload.read_text(encoding="utf-8-sig")
+        prompt = job.payload.read_text(encoding="utf-8-sig", errors="replace")
 
-        return (
+        result = (
             prompt,
             job.save_filename,
             job.index,
@@ -80,3 +80,7 @@ class PromptBatchLoader:
             job.metadata["prompt_filename_no_ext"],
             job.metadata["prompt_relative_path"],
         )
+        return {
+            "ui": {"batch_index": [job.index], "batch_total": [job.total]},
+            "result": result,
+        }
