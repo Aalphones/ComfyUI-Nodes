@@ -98,31 +98,51 @@ function installApiMarker() {
   };
 }
 
+const BATCH_NODE_CLASSES = new Set(['ImageBatchLoader', 'PromptBatchLoader']);
+
 function installAutoRequeue() {
   // Continue the batch automatically after each successful execution.
   // The cursor on the server side persists between queue runs — no reset, no
   // restart from the beginning if the run was interrupted mid-batch.
+  //
+  // Dedup per prompt_id: when multiple batch nodes are in the same workflow
+  // (e.g. ImageBatchLoader + PromptBatchLoader), both fire 'executed' events.
+  // Without dedup this would schedule two requeue calls per run. The first
+  // batch node whose event arrives gets to decide whether to requeue; later
+  // events for the same prompt execution are ignored.
+  const requeued = new Set();
+
   api.addEventListener('executed', ({ detail }) => {
     const output = detail?.output;
     if (!output || output.batch_index === undefined) {
       return;
     }
 
-    // Guard: only requeue when the node that just executed is part of the
-    // currently loaded canvas graph. Without this, a batch running in a queued
-    // workflow can accidentally trigger re-queuing of a completely different
-    // workflow that happens to be loaded on the canvas at that moment.
+    // Guard: only react to known batch nodes that are part of the currently
+    // loaded canvas graph. This prevents a queued workflow from accidentally
+    // triggering re-queuing of a different workflow on the canvas, and
+    // prevents cross-node state sharing (ImageBatchLoader must not stop
+    // PromptBatchLoader's batch and vice versa).
     const nodeId = detail?.node;
-    if (nodeId !== undefined) {
-      const node = app.graph.getNodeById(parseInt(nodeId, 10));
-      if (!node) {
-        return;
-      }
+    if (nodeId === undefined) {
+      return;
+    }
+    const node = app.graph.getNodeById(parseInt(nodeId, 10));
+    if (!node || !BATCH_NODE_CLASSES.has(node.type)) {
+      return;
+    }
+
+    const promptId = detail?.prompt_id;
+    if (promptId !== undefined && requeued.has(promptId)) {
+      return;
     }
 
     const currentIndex = output.batch_index[0];
     const totalItems = output.batch_total[0];
     if (currentIndex < totalItems) {
+      if (promptId !== undefined) {
+        requeued.add(promptId);
+      }
       app.queuePrompt(0, 1);
     }
   });
